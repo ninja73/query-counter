@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
 	"query-counter/btree"
@@ -12,10 +11,10 @@ func main() {
 	var inputPath = flag.String("input", "./queries.txt", "Parser file")
 	var outputPath = flag.String("output", "./result.txt", "Result file")
 	var cacheSize = flag.Int("cache-size", 10000, "Cache size")
-	var indexes = flag.String("indexes", "./indexes", "Index file")
+	var db = flag.String("db", "./db", "Index file")
 	flag.Parse()
 
-	bTree, err := btree.NewBTree(*indexes)
+	bTree, err := btree.NewBTree(*db)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,7 +25,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	queryReader, err := NewQueryReader(*inputPath)
+	queryReader, err := NewQueryReader(*inputPath, worker)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,14 +33,15 @@ func main() {
 
 	worker.InitWorkers()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go worker.ResultProcessing(ctx)
+	go worker.ResultProcessing()
 
-	if err := queryReader.Run(worker.Send); err != nil {
+	if err := queryReader.Run(); err != nil {
 		log.Fatal(err)
 	}
-	worker.Wait(cancel)
+	worker.Wait()
+
 	if err := worker.ExportToFile(*outputPath); err != nil {
 		log.Fatal(err)
 	}
+	log.Println("Query counter done")
 }
