@@ -90,3 +90,11 @@ func (lru *LRU) Get(key string) (*Node, bool) {
 		return nil, false
 	}
 }
+
+func (lru *LRU) Range(f func(key string, value *Node) bool) {
+	lru.data.Range(func(key, value interface{}) bool {
+		keyString := key.(string)
+		node := value.(*Node)
+		return f(keyString, node)
+	})
+}
