@@ -294,7 +294,7 @@ func (n *bTreeNode) writeToFile(file *os.File) error {
 
 	for len(queue) > 0 {
 		blockID := queue[0]
-		queue = queue[0:]
+		queue = queue[1:]
 		bt, err := n.bs.nodeAtBlockID(blockID)
 		if err != nil {
 			return err
