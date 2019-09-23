@@ -43,9 +43,15 @@ func (lru *LRU) attach(node *Node) *Node {
 		lru.head = node
 		lru.tail = node
 	}
+
 	if lru.len == lru.maxSize && lru.tail != nil {
 		old := lru.tail
-		lru.tail = old.prev
+		newTail := old.prev
+		newTail.next = nil
+		lru.tail = newTail
+
+		old.prev = nil
+		old.next = nil
 		lru.data.Delete(old.Key)
 		return old
 	}
@@ -73,9 +79,9 @@ func (lru *LRU) PushOrIncrement(key string, value uint64) (old *Node) {
 	if ok {
 		atomic.AddUint64(&node.Value, value)
 		lru.detach(node)
-		lru.attach(node)
+		old = lru.attach(node)
 	} else {
-		lru.attach(node)
+		old = lru.attach(node)
 	}
 	return
 }

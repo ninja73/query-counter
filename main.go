@@ -18,6 +18,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer bTree.Close()
+
 	cache := lru.NewLRU(*cacheSize)
 
 	worker, err := NewQueryWorker(bTree, 10, cache)
