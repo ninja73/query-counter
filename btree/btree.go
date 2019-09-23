@@ -5,6 +5,7 @@ import "os"
 type BTree struct {
 	root *bTreeNode
 	file *os.File
+	path string
 }
 
 func NewBTree(path string) (*BTree, error) {
@@ -17,7 +18,7 @@ func NewBTree(path string) (*BTree, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &BTree{root: rootNode, file: file}, nil
+	return &BTree{root: rootNode, file: file, path: path}, nil
 }
 
 func (bt *BTree) Update(key string, value uint64) (bool, error) {
@@ -48,5 +49,22 @@ func (bt *BTree) SetRootNode(n *bTreeNode) {
 }
 
 func (bt *BTree) Close() error {
-	return bt.file.Close()
+	if err := bt.file.Close(); err != nil {
+		return err
+	}
+
+	_, err := os.Stat(bt.path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if err := os.Remove(bt.path); err != nil {
+		return err
+	}
+
+	return nil
 }
