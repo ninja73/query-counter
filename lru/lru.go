@@ -2,27 +2,27 @@ package lru
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 type Node struct {
 	prev  *Node
 	next  *Node
-	Key   string
-	Value uint64
+	key   string
+	value uint64
 }
 
 type LRU struct {
-	data    sync.Map
+	data    map[string]*Node
 	head    *Node
 	tail    *Node
 	maxSize int
 	len     int
-	lock    sync.Mutex
+	lock    sync.RWMutex
 }
 
 func NewLRU(maxSize int) *LRU {
 	return &LRU{
+		data:    make(map[string]*Node, maxSize),
 		head:    nil,
 		tail:    nil,
 		maxSize: maxSize,
@@ -30,10 +30,23 @@ func NewLRU(maxSize int) *LRU {
 	}
 }
 
-func (lru *LRU) attach(node *Node) *Node {
-	lru.lock.Lock()
-	defer lru.lock.Unlock()
+func (lru *LRU) removeOld() *Node {
+	if lru.len > lru.maxSize {
+		old := lru.tail
+		newTail := old.prev
+		newTail.next = nil
+		lru.tail = newTail
 
+		old.prev = nil
+		old.next = nil
+		delete(lru.data, old.key)
+		lru.len -= 1
+		return old
+	}
+	return nil
+}
+
+func (lru *LRU) attach(node *Node) {
 	lru.len += 1
 	if lru.head != nil {
 		node.next = lru.head
@@ -43,64 +56,66 @@ func (lru *LRU) attach(node *Node) *Node {
 		lru.head = node
 		lru.tail = node
 	}
-
-	if lru.len == lru.maxSize && lru.tail != nil {
-		old := lru.tail
-		newTail := old.prev
-		newTail.next = nil
-		lru.tail = newTail
-
-		old.prev = nil
-		old.next = nil
-		lru.data.Delete(old.Key)
-		return old
-	}
-	return nil
 }
 
 func (lru *LRU) detach(node *Node) {
-	lru.lock.Lock()
-	defer lru.lock.Unlock()
-
 	lru.len -= 1
 	if node.prev != nil {
 		node.prev.next = node.next
+	} else {
+		lru.head = node.next
 	}
+
 	if node.next != nil {
 		node.next.prev = node.prev
 	} else {
 		lru.tail = node.prev
 	}
+
+	node.prev = nil
+	node.next = nil
 }
 
-func (lru *LRU) PushOrIncrement(key string, value uint64) (old *Node) {
-	n, ok := lru.data.LoadOrStore(key, &Node{Key: key, Value: value})
-	node := n.(*Node)
+func (lru *LRU) PushOrIncrement(key string, value uint64) (uint64, bool) {
+	lru.lock.Lock()
+	defer lru.lock.Unlock()
+
+	node, ok := lru.data[key]
 	if ok {
-		atomic.AddUint64(&node.Value, value)
-		lru.detach(node)
-		old = lru.attach(node)
-	} else {
-		old = lru.attach(node)
-	}
-	return
-}
-
-func (lru *LRU) Get(key string) (*Node, bool) {
-	if n, ok := lru.data.Load(key); ok {
-		node := n.(*Node)
+		node.value += 1
 		lru.detach(node)
 		lru.attach(node)
-		return node, true
 	} else {
-		return nil, false
+		node = &Node{key: key, value: value}
+		lru.data[key] = node
+		lru.attach(node)
+	}
+
+	if old := lru.removeOld(); old != nil {
+		return old.value, true
+	}
+
+	return 0, false
+}
+
+func (lru *LRU) Get(key string) (uint64, bool) {
+	lru.lock.RLock()
+	defer lru.lock.RUnlock()
+
+	if node, ok := lru.data[key]; ok {
+		lru.detach(node)
+		lru.attach(node)
+		return node.value, true
+	} else {
+		return 0, false
 	}
 }
 
-func (lru *LRU) Range(f func(key string, value *Node) bool) {
-	lru.data.Range(func(key, value interface{}) bool {
-		keyString := key.(string)
-		node := value.(*Node)
-		return f(keyString, node)
-	})
+func (lru *LRU) Range(f func(key string, value uint64)) {
+	lru.lock.RLock()
+	defer lru.lock.RUnlock()
+
+	for k, v := range lru.data {
+		f(k, v.value)
+	}
 }

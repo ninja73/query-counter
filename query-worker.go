@@ -35,9 +35,9 @@ func NewQueryWorker(db *btree.BTree, poolSize int, cache *lru.LRU) (*QueryWorker
 func (qw *QueryWorker) worker(jobs <-chan string, results chan<- query) {
 	defer qw.wg.Done()
 	for j := range jobs {
-		old := qw.cache.PushOrIncrement(j, 1)
-		if old != nil {
-			results <- query{key: old.Key, vale: old.Value}
+		oldValue, hasOld := qw.cache.PushOrIncrement(j, 1)
+		if hasOld {
+			results <- query{key: j, vale: oldValue}
 		}
 	}
 }
@@ -85,11 +85,10 @@ func (qw *QueryWorker) Close() {
 
 func (qw *QueryWorker) Wait() {
 	qw.wg.Wait()
-	qw.cache.Range(func(key string, value *lru.Node) bool {
-		if err := qw.writeToDB(key, value.Value); err != nil {
+	qw.cache.Range(func(key string, value uint64) {
+		if err := qw.writeToDB(key, value); err != nil {
 			log.Fatal(err)
 		}
-		return true
 	})
 }
 
