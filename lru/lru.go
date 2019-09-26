@@ -1,6 +1,7 @@
 package lru
 
 import (
+	"errors"
 	"sync"
 )
 
@@ -20,14 +21,18 @@ type LRU struct {
 	lock    sync.RWMutex
 }
 
-func NewLRU(maxSize int) *LRU {
+func NewLRU(maxSize int) (*LRU, error) {
+	if maxSize <= 0 {
+		return nil, errors.New("lru max-size must provide a positive size")
+	}
+
 	return &LRU{
 		data:    make(map[string]*Node, maxSize),
 		head:    nil,
 		tail:    nil,
 		maxSize: maxSize,
 		len:     0,
-	}
+	}, nil
 }
 
 func (lru *LRU) removeOld() *Node {

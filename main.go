@@ -20,7 +20,10 @@ func main() {
 	}
 	defer bTree.Close()
 
-	cache := lru.NewLRU(*cacheSize)
+	cache, err := lru.NewLRU(*cacheSize)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	worker, err := NewQueryWorker(bTree, 10, cache)
 	if err != nil {
