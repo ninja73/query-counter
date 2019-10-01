@@ -18,7 +18,7 @@ type LRU struct {
 	tail    *Node
 	maxSize int
 	len     int
-	lock    sync.RWMutex
+	lock    sync.Mutex
 }
 
 func NewLRU(maxSize int) (*LRU, error) {
@@ -104,8 +104,8 @@ func (lru *LRU) PushOrIncrement(key string, value uint64) (uint64, bool) {
 }
 
 func (lru *LRU) Get(key string) (uint64, bool) {
-	lru.lock.RLock()
-	defer lru.lock.RUnlock()
+	lru.lock.Lock()
+	defer lru.lock.Unlock()
 
 	if node, ok := lru.data[key]; ok {
 		lru.detach(node)
@@ -117,8 +117,8 @@ func (lru *LRU) Get(key string) (uint64, bool) {
 }
 
 func (lru *LRU) Range(f func(key string, value uint64)) {
-	lru.lock.RLock()
-	defer lru.lock.RUnlock()
+	lru.lock.Lock()
+	defer lru.lock.Unlock()
 
 	for k, v := range lru.data {
 		f(k, v.value)
